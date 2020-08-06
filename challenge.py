@@ -7,7 +7,7 @@
     # 3. Budget - wiki data not as consistent as Kaggle
     # 4. Box Office - similar results as budget, stick with same source
     # 5. Release data - all Kaggle data has release dates
-    # 6. Langurage - more info in Wiki but Kaggle is more consistent for time saved in cleaning
+    # 6. Language - more info in Wiki but Kaggle is more consistent for time saved in cleaning
     # 7. Production company - Kaggle data is more consistent
     
     # Resulting assumption table looks like:
