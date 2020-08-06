@@ -168,3 +168,18 @@ def parse_dollars(s): # setting function to
         return np.nan
 
 
+# clean & merge box_office columns
+try: 
+    # drop rows in box_office with nulls and put in list
+    box_office = wiki_movies_df['Box office'].dropna() 
+    box_office = box_office.apply(lambda x: ' '.join(x) if type(x) == list else x)
+    
+    # extract values from box_office and apply the f(x) parse_dollars
+    wiki_movies_df['box_office'] = box_office.str.extract(
+        f'({form_one}|{form_two})', flags=re.IGNORECASE)[0].apply(parse_dollars)
+    wiki_movies_df.drop('Box office', axis=1, inplace=True)
+except KeyError:
+    pass
+
+
+
