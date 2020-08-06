@@ -296,3 +296,15 @@ movies_df.rename({'id':'kaggle_id',
                   'Based on':'based_on'
                  }, axis='columns', inplace=True)
 
+# Make ratings data sizable, rename columns, and pivot ratings
+rating_counts = ratings.groupby(['movieId','rating'], as_index=False).count() \
+                .rename({'userId':'count'}, axis=1) \
+                .pivot(index='movieId',columns='rating', values='count')
+# change column names to include rating using list comprehension
+rating_counts.columns = ['rating_' + str(col) for col in rating_counts.columns]
+# Merge the movies_df and rating_counts dfs
+movies_with_ratings_df = pd.merge(movies_df, rating_counts, left_on='kaggle_id', right_index=True, how='left')
+# fill in missing values with zeroes
+movies_with_ratings_df[rating_counts.columns] = movies_with_ratings_df[rating_counts.columns].fillna(0)
+
+
