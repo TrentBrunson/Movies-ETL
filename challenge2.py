@@ -212,7 +212,6 @@ except KeyError:
 
 kaggle_metafile = pd.read_csv(f'{file_dir}{kaggle_metafile}', low_memory=False)
 
-
 # Clean Kaggle metadata
 kaggle_metafile = kaggle_metafile[kaggle_metafile['adult'] == 'False'].drop('adult',axis='columns') # dropping adult films
 kaggle_metafile['video'] = kaggle_metafile['video'] == 'True'  # convert video column to boolean data type
@@ -221,4 +220,24 @@ kaggle_metafile['budget'] = kaggle_metafile['budget'].astype(int)
 kaggle_metafile['id'] = pd.to_numeric(kaggle_metafile['id'], errors='raise')
 kaggle_metafile['popularity'] = pd.to_numeric(kaggle_metafile['popularity'], errors='raise')
 kaggle_metafile['release_date'] = pd.to_datetime(kaggle_metafile['release_date'])
+
+try: 
+    ratings = pd.read_csv(f'{file_dir}{ratings_file}', low_memory=False)  
+except:
+    print('Ratings file failed to load.  Check filename and file directory.')
+    
+# Merge movie and kaggle dataframes; remove unnecessary columns
+movies_df = pd.merge(wiki_movies_df, kaggle_metafile, on='imdb_id', suffixes=['_wiki','_kaggle'])
+# dropping from here to eternity outlier
+movies_df = movies_df.drop(movies_df[(movies_df['release_date_wiki'] > '1996-01-01') & (movies_df['release_date_kaggle'] < '1965-01-01')].index)
+# dropping wiki release dates, languages and productions company
+movies_df.drop(columns=['title_wiki','release_date_wiki','Language','Production company(s)'], inplace=True)
+
+# f(x) to fill in missing data and then drop redundant columns
+def fill_missing_kaggle_data(df, kaggle_column, wiki_column):
+    df[kaggle_column] = df.apply(
+        lambda row: row[wiki_column] if row[kaggle_column] == 0 else row[kaggle_column]
+        , axis=1)
+    df.drop(columns=wiki_column, inplace=True)
+
 
