@@ -20,7 +20,7 @@
         # release_date_wiki        release_date_kaggle   Drop Wiki
         # Language                 original_language     Drop Wiki
         # Production company(s)    production_companies  Drop Wiki 
-        
+
 # import dependencies
 import os
 import pandas as pd
@@ -46,7 +46,7 @@ ratings_file = 'ratings.csv'
     # Wikipedia data
     # Kaggle metadata
     # MovieLens rating data (from Kaggle)
-def load_movies(wiki_movie_file, kaggle_metafile, ratings_file):
+def load_movies(wiki_movies, kaggle_metadata, ratings):
     try: 
         with open(f'{file_dir}/wikipedia.movies.json', mode='r') as file:
             wiki_movies_raw = json.load(file)
@@ -57,12 +57,17 @@ def load_movies(wiki_movie_file, kaggle_metafile, ratings_file):
     # filtering out TV shows from movies
     wiki_movies = [movie for movie in wiki_movies_raw 
                if ('Director' in movie or 'Directed by' in movie) 
-                and 'imdb_link' in movie 
-                and 'No. of episodes' not in movie]
+                   and 'imdb_link' in movie 
+               and 'No. of episodes' not in movie]
+    try:
+        kaggle_metadata = pd.read_csv(f'{file_dir}{kaggle_metafile}', low_memory=False)
+    except:
+        print('Kaggle file failed to load.  Check filename and file directory.')
 
-    kaggle_metadata = pd.read_csv(f'{file_dir}{kaggle_metafile}', low_memory=False)
-
-    ratings = pd.read_csv(f'{file_dir}{ratings_file}', low_memory=False)  
+    try: 
+        ratings = pd.read_csv(f'{file_dir}{ratings_file}', low_memory=False)  
+    except:
+        print('Ratings file failed to load.  Check filename and file directory.')
     
 # ------------------------------------------------------------------
 
@@ -113,9 +118,11 @@ def clean_movie(movie):
 
     return movie
 
-    # rerunning list comprehension to clean wiki_movies and recreate the DF
-    clean_movies = [clean_movie(movie) for movie in wiki_movies]
-    wiki_movies_df = pd.DataFrame(clean_movies)
+# Calling functions for future use
+load_movies(wiki_movie_file, kaggle_metafile, ratings_file)
+# rerunning list comprehension to clean wiki_movies and recreate the DF
+clean_movies = [clean_movie(movie) for movie in wiki_movie_file]
+wiki_movies_df = pd.DataFrame(clean_movies)
 
 # Regular expressions to IMDB IDs for dupes, then drop them
 wiki_movies_df['imdb_id'] = wiki_movies_df['imdb_link'].str.extract(r'(tt\d{7})')
@@ -167,6 +174,7 @@ def parse_dollars(s): # setting function to
     else:
         return np.nan
 
+
 # clean & merge box_office columns
 try: 
     # drop rows in box_office with nulls and put in list
@@ -180,63 +188,135 @@ try:
 except KeyError:
     pass
 
-# clean budget column
+#  parse release date, making variable to hold non-null values 
+# & converting lists to strings
 try:
-        asdf
+    release_date = wiki_movies_df['Release date'].dropna().apply(lambda x: ' '.join(x) if type(x) == list else x)
+    date_form_one = r'(?:January|February|March|April|May|June|July|August|September|October|November|December)\s[123]\d,\s\d{4}'
+    date_form_two = r'\d{4}.[01]\d.[123]\d'
+    date_form_three = r'(?:January|February|March|April|May|June|July|August|September|October|November|December)\s\d{4}'
+    date_form_four = r'\d{4}'
+    wiki_movies_df['release_date'] = pd.to_datetime(release_date.str.extract(
+        f'({date_form_one}|{date_form_two}|{date_form_three}|{date_form_four})')[0], infer_datetime_format=True)
 except KeyError:
-        pass
-        
-# clean release date
+    pass
+
 try:
-        asdf
+    running_time = wiki_movies_df['Running time'].dropna().apply(lambda x: ' '.join(x) if type(x) == list else x)
+    running_time_extract = running_time.str.extract(r'(\d+)\s*ho?u?r?s?\s*(\d*)|(\d+)\s*m')
+    running_time_extract = running_time_extract.apply(lambda col: pd.to_numeric(col, errors='coerce')).fillna(0)
+    wiki_movies_df['running_time'] = running_time_extract.apply(lambda row: row[0]*60 + row[1] if row[2] == 0 else row[2], axis=1)
+    wiki_movies_df.drop('Running time', axis=1, inplace=True)
 except KeyError:
-        pass
+    pass
 
-# clean running time        
+kaggle_metafile = pd.read_csv(f'{file_dir}{kaggle_metafile}', low_memory=False)
+
+# Clean Kaggle metadata
+kaggle_metafile = kaggle_metafile[kaggle_metafile['adult'] == 'False'].drop('adult',axis='columns') # dropping adult films
+kaggle_metafile['video'] = kaggle_metafile['video'] == 'True'  # convert video column to boolean data type
+# Setting data types for columns; raising issues if there's mixed data in the column that cannot be converted
+kaggle_metafile['budget'] = kaggle_metafile['budget'].astype(int)
+kaggle_metafile['id'] = pd.to_numeric(kaggle_metafile['id'], errors='raise')
+kaggle_metafile['popularity'] = pd.to_numeric(kaggle_metafile['popularity'], errors='raise')
+kaggle_metafile['release_date'] = pd.to_datetime(kaggle_metafile['release_date'])
+
+try: 
+    ratings = pd.read_csv(f'{file_dir}{ratings_file}', low_memory=False)  
+except:
+    print('Ratings file failed to load.  Check filename and file directory.')
+
+# Merge movie and kaggle dataframes; remove unnecessary columns
+movies_df = pd.merge(wiki_movies_df, kaggle_metafile, on='imdb_id', suffixes=['_wiki','_kaggle'])
+# dropping from here to eternity outlier
+movies_df = movies_df.drop(movies_df[(movies_df['release_date_wiki'] > '1996-01-01') & (movies_df['release_date_kaggle'] < '1965-01-01')].index)
+# dropping wiki release dates, languages and productions company
+movies_df.drop(columns=['title_wiki','release_date_wiki','Language','Production company(s)'], inplace=True)
+
+# f(x) to fill in missing data and then drop redundant columns
+def fill_missing_kaggle_data(df, kaggle_column, wiki_column):
+    df[kaggle_column] = df.apply(
+        lambda row: row[wiki_column] if row[kaggle_column] == 0 else row[kaggle_column]
+        , axis=1)
+    df.drop(columns=wiki_column, inplace=True)
+
 try:
-        asdf
+    fill_missing_kaggle_data(movies_df, 'runtime', 'running_time')
 except KeyError:
-        pass
+    pass
 
-# clean Kaggle metadata
 try:
-        asdf
+    fill_missing_kaggle_data(movies_df, 'budget_kaggle', 'budget_wiki')
 except KeyError:
-        pass        
-        
-# clean ratings data
+    pass
+
 try:
-        asdf
+    fill_missing_kaggle_data(movies_df, 'revenue', 'box_office')
 except KeyError:
-        pass        
-        
-# ------------------------------------------------------------------
+    pass
 
+# Reordering columns into logical groups
+    # Identifying information (IDs, titles, URLs, etc.)
+    # Quantitative facts (runtime, budget, revenue, etc.)
+    # Qualitative facts (genres, languages, country, etc.)
+    # Business data (production companies, distributors, etc.)
+    # People (producers, director, cast, writers, etc.)
 
-# ------------------------------------------------------------------
-# Load new data into PostgreSQL DB
-    # 
-    # create a variable for the number of rows imported
-# def load_db()    
-#     rows_imported = 0
+movies_df = movies_df.loc[:, ['imdb_id','id','title_kaggle','original_title','tagline','belongs_to_collection','url','imdb_link',
+                       'runtime','budget_kaggle','revenue','release_date_kaggle','popularity','vote_average','vote_count',
+                       'genres','original_language','overview','spoken_languages','Country',
+                       'production_companies','production_countries','Distributor',
+                       'Producer(s)','Director','Starring','Cinematography','Editor(s)','Writer(s)','Composer(s)','Based on'
+                      ]]
 
-#     # get the start_time from time.time()
-#     start_time = time.time()
+# Rename columns to be more consistent
+movies_df.rename({'id':'kaggle_id',
+                  'title_kaggle':'title',
+                  'url':'wikipedia_url',
+                  'budget_kaggle':'budget',
+                  'release_date_kaggle':'release_date',
+                  'Country':'country',
+                  'Distributor':'distributor',
+                  'Producer(s)':'producers',
+                  'Director':'director',
+                  'Starring':'starring',
+                  'Cinematography':'cinematography',
+                  'Editor(s)':'editors',
+                  'Writer(s)':'writers',
+                  'Composer(s)':'composers',
+                  'Based on':'based_on'
+                 }, axis='columns', inplace=True)
 
-#     for data in pd.read_csv(f'{file_dir}ratings.csv', chunksize=1000000):
+# Make ratings data sizable, rename columns, and pivot ratings
+rating_counts = ratings.groupby(['movieId','rating'], as_index=False).count() \
+                .rename({'userId':'count'}, axis=1) \
+                .pivot(index='movieId',columns='rating', values='count')
+# change column names to include rating using list comprehension
+rating_counts.columns = ['rating_' + str(col) for col in rating_counts.columns]
+# Merge the movies_df and rating_counts dfs
+movies_with_ratings_df = pd.merge(movies_df, rating_counts, left_on='kaggle_id', right_index=True, how='left')
+# fill in missing values with zeroes
+movies_with_ratings_df[rating_counts.columns] = movies_with_ratings_df[rating_counts.columns].fillna(0)
 
-#         # print out the range of rows that are being imported
-#         print(f'importing rows {rows_imported} to {rows_imported + len(data)}...', end='')
-#         data.to_sql(name='ratings', con=engine, if_exists='append')
-#         # increment the number of rows imported by the size of 'data'
-#         rows_imported += len(data)
+# Load into SQL DB
+db_string = f"postgres://postgres:{db_password}@127.0.0.1:51734/movie_data"
+engine = create_engine(db_string)
+movies_df.to_sql(name='movies', con=engine)
 
-#         # print that the rows have finished importing
-#         # add elapsed time to final print out
-#         print(f'Done. {time.time() - start_time} total seconds elapsed')
-# ------------------------------------------------------------------
+# create a variable for the number of rows imported
+rows_imported = 0
 
-# Check that the function works correctly on the current Wikipedia and Kaggle data.
-load_movies(wiki_movie_file, kaggle_metafile, ratings_file)
-clean_movie(movie)
-# load_db()
+# get the start_time from time.time()
+start_time = time.time()
+
+for data in pd.read_csv(f'{file_dir}ratings.csv', chunksize=1000000):
+
+    # print out the range of rows that are being imported
+    print(f'importing rows {rows_imported} to {rows_imported + len(data)}...', end='')
+    data.to_sql(name='ratings', con=engine, if_exists='append')
+    # increment the number of rows imported by the size of 'data'
+    rows_imported += len(data)
+    
+    # print that the rows have finished importing
+    # add elapsed time to final print out
+    print(f'Done. {time.time() - start_time} total seconds elapsed')

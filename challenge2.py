@@ -255,15 +255,6 @@ try:
 except KeyError:
     pass
 
-# checking for columns with only one value
-# converting lists to tuples for value_counts() to work
-# for col in movies_df.columns:
-#     lists_to_tuples = lambda x: tuple(x) if type(x) == list else x
-#     value_counts = movies_df[col].apply(lists_to_tuples).value_counts(dropna=False)
-#     num_values = len(value_counts)
-#     if num_values == 1:
-#         movies_df.drop(columns=col, inplace=True)
-
 # Reordering columns into logical groups
     # Identifying information (IDs, titles, URLs, etc.)
     # Quantitative facts (runtime, budget, revenue, etc.)
@@ -307,4 +298,25 @@ movies_with_ratings_df = pd.merge(movies_df, rating_counts, left_on='kaggle_id',
 # fill in missing values with zeroes
 movies_with_ratings_df[rating_counts.columns] = movies_with_ratings_df[rating_counts.columns].fillna(0)
 
+# Load into SQL DB
+db_string = f"postgres://postgres:{db_password}@127.0.0.1:51734/movie_data"
+engine = create_engine(db_string)
+movies_df.to_sql(name='movies', con=engine)
 
+# create a variable for the number of rows imported
+rows_imported = 0
+
+# get the start_time from time.time()
+start_time = time.time()
+
+for data in pd.read_csv(f'{file_dir}ratings.csv', chunksize=1000000):
+
+    # print out the range of rows that are being imported
+    print(f'importing rows {rows_imported} to {rows_imported + len(data)}...', end='')
+    data.to_sql(name='ratings', con=engine, if_exists='append')
+    # increment the number of rows imported by the size of 'data'
+    rows_imported += len(data)
+    
+    # print that the rows have finished importing
+    # add elapsed time to final print out
+    print(f'Done. {time.time() - start_time} total seconds elapsed')
