@@ -117,7 +117,13 @@ def clean_movie(movie):
 clean_movies = [clean_movie(movie) for movie in wiki_movie_file]
 wiki_movies_df = pd.DataFrame(clean_movies)
 
+# Regular expressions to IMDB IDs for dupes, then drop them
+wiki_movies_df['imdb_id'] = wiki_movies_df['imdb_link'].str.extract(r'(tt\d{7})')
+wiki_movies_df.drop_duplicates(subset='imdb_id', inplace=True)
 
+# list comprehension to look for only columns that are more than 90% filled
+wiki_columns_to_keep = [column for column in wiki_movies_df.columns if wiki_movies_df[column].isnull().sum() < len(wiki_movies_df) * 0.9]
+wiki_movies_df = wiki_movies_df[wiki_columns_to_keep]
 
 
 
