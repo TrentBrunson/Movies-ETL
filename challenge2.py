@@ -59,10 +59,15 @@ def load_movies(wiki_movies, kaggle_metadata, ratings):
                if ('Director' in movie or 'Directed by' in movie) 
                    and 'imdb_link' in movie 
                and 'No. of episodes' not in movie]
+    try:
+        kaggle_metadata = pd.read_csv(f'{file_dir}{kaggle_metafile}', low_memory=False)
+    except:
+        print('Kaggle file failed to load.  Check filename and file directory.')
 
-    kaggle_metadata = pd.read_csv(f'{file_dir}{kaggle_metafile}', low_memory=False)
-
-    ratings = pd.read_csv(f'{file_dir}{ratings_file}', low_memory=False)  
+    try: 
+        ratings = pd.read_csv(f'{file_dir}{ratings_file}', low_memory=False)  
+    except:
+        print('Ratings file failed to load.  Check filename and file directory.')
     
 # ------------------------------------------------------------------
 
@@ -113,6 +118,8 @@ def clean_movie(movie):
 
     return movie
 
+# Calling functions for future use
+load_movies(wiki_movie_file, kaggle_metafile, ratings_file)
 # rerunning list comprehension to clean wiki_movies and recreate the DF
 clean_movies = [clean_movie(movie) for movie in wiki_movie_file]
 wiki_movies_df = pd.DataFrame(clean_movies)
@@ -202,4 +209,16 @@ try:
     wiki_movies_df.drop('Running time', axis=1, inplace=True)
 except KeyError:
     pass
+
+kaggle_metafile = pd.read_csv(f'{file_dir}{kaggle_metafile}', low_memory=False)
+
+
+# Clean Kaggle metadata
+kaggle_metafile = kaggle_metafile[kaggle_metafile['adult'] == 'False'].drop('adult',axis='columns') # dropping adult films
+kaggle_metafile['video'] = kaggle_metafile['video'] == 'True'  # convert video column to boolean data type
+# Setting data types for columns; raising issues if there's mixed data in the column that cannot be converted
+kaggle_metafile['budget'] = kaggle_metafile['budget'].astype(int)
+kaggle_metafile['id'] = pd.to_numeric(kaggle_metafile['id'], errors='raise')
+kaggle_metafile['popularity'] = pd.to_numeric(kaggle_metafile['popularity'], errors='raise')
+kaggle_metafile['release_date'] = pd.to_datetime(kaggle_metafile['release_date'])
 
