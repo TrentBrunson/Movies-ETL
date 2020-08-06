@@ -225,7 +225,7 @@ try:
     ratings = pd.read_csv(f'{file_dir}{ratings_file}', low_memory=False)  
 except:
     print('Ratings file failed to load.  Check filename and file directory.')
-    
+
 # Merge movie and kaggle dataframes; remove unnecessary columns
 movies_df = pd.merge(wiki_movies_df, kaggle_metafile, on='imdb_id', suffixes=['_wiki','_kaggle'])
 # dropping from here to eternity outlier
@@ -240,4 +240,26 @@ def fill_missing_kaggle_data(df, kaggle_column, wiki_column):
         , axis=1)
     df.drop(columns=wiki_column, inplace=True)
 
+try:
+    fill_missing_kaggle_data(movies_df, 'runtime', 'running_time')
+except KeyError:
+    pass
 
+try:
+    fill_missing_kaggle_data(movies_df, 'budget_kaggle', 'budget_wiki')
+except KeyError:
+    pass
+
+try:
+    fill_missing_kaggle_data(movies_df, 'revenue', 'box_office')
+except KeyError:
+    pass
+
+# checking for columns with only one value
+# converting lists to tuples for value_counts() to work
+for col in movies_df.columns:
+    lists_to_tuples = lambda x: tuple(x) if type(x) == list else x
+    value_counts = movies_df[col].apply(lists_to_tuples).value_counts(dropna=False)
+    num_values = len(value_counts)
+    if num_values == 1:
+        print(col)
