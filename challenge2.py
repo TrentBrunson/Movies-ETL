@@ -257,9 +257,42 @@ except KeyError:
 
 # checking for columns with only one value
 # converting lists to tuples for value_counts() to work
-for col in movies_df.columns:
-    lists_to_tuples = lambda x: tuple(x) if type(x) == list else x
-    value_counts = movies_df[col].apply(lists_to_tuples).value_counts(dropna=False)
-    num_values = len(value_counts)
-    if num_values == 1:
-        print(col)
+# for col in movies_df.columns:
+#     lists_to_tuples = lambda x: tuple(x) if type(x) == list else x
+#     value_counts = movies_df[col].apply(lists_to_tuples).value_counts(dropna=False)
+#     num_values = len(value_counts)
+#     if num_values == 1:
+#         movies_df.drop(columns=col, inplace=True)
+
+# Reordering columns into logical groups
+    # Identifying information (IDs, titles, URLs, etc.)
+    # Quantitative facts (runtime, budget, revenue, etc.)
+    # Qualitative facts (genres, languages, country, etc.)
+    # Business data (production companies, distributors, etc.)
+    # People (producers, director, cast, writers, etc.)
+
+movies_df = movies_df.loc[:, ['imdb_id','id','title_kaggle','original_title','tagline','belongs_to_collection','url','imdb_link',
+                       'runtime','budget_kaggle','revenue','release_date_kaggle','popularity','vote_average','vote_count',
+                       'genres','original_language','overview','spoken_languages','Country',
+                       'production_companies','production_countries','Distributor',
+                       'Producer(s)','Director','Starring','Cinematography','Editor(s)','Writer(s)','Composer(s)','Based on'
+                      ]]
+
+# Rename columns to be more consistent
+movies_df.rename({'id':'kaggle_id',
+                  'title_kaggle':'title',
+                  'url':'wikipedia_url',
+                  'budget_kaggle':'budget',
+                  'release_date_kaggle':'release_date',
+                  'Country':'country',
+                  'Distributor':'distributor',
+                  'Producer(s)':'producers',
+                  'Director':'director',
+                  'Starring':'starring',
+                  'Cinematography':'cinematography',
+                  'Editor(s)':'editors',
+                  'Writer(s)':'writers',
+                  'Composer(s)':'composers',
+                  'Based on':'based_on'
+                 }, axis='columns', inplace=True)
+
