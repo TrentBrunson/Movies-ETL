@@ -181,5 +181,17 @@ try:
 except KeyError:
     pass
 
+#  parse release date, making variable to hold non-null values 
+# & converting lists to strings
+try:
+    release_date = wiki_movies_df['Release date'].dropna().apply(lambda x: ' '.join(x) if type(x) == list else x)
+    date_form_one = r'(?:January|February|March|April|May|June|July|August|September|October|November|December)\s[123]\d,\s\d{4}'
+    date_form_two = r'\d{4}.[01]\d.[123]\d'
+    date_form_three = r'(?:January|February|March|April|May|June|July|August|September|October|November|December)\s\d{4}'
+    date_form_four = r'\d{4}'
+    wiki_movies_df['release_date'] = pd.to_datetime(release_date.str.extract(
+        f'({date_form_one}|{date_form_two}|{date_form_three}|{date_form_four})')[0], infer_datetime_format=True)
+except KeyError:
+    pass
 
 
