@@ -1,6 +1,6 @@
-# |---*** Automate ETL pipeline ***---|
+# |---*** Automate ETL pipeline ***---| 
 
-# Document any assumptions made
+# Documentomg assumptions
 
     # 1. Assuming both sets of title data are good - selecting Kaggle
     # 2. Kaggle data has more accurate running time data; Wiki data filled in with zeros 
